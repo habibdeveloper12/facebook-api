@@ -6,16 +6,41 @@ const session = require("express-session");
 const app = express();
 var mongodb = require("mongodb");
 const PORT = 5000;
-var MongoClient = mongodb.MongoClient;
-MongoClient.connect(URL, function (err, database) {
-  error = err;
-  db = database;
-
-  waiting.forEach(function (callback) {
-    callback(err, database);
-  });
+const { MongoClient } = require("mongodb");
+app.use(bodyParser.json());
+// Connection URI
+const uri = "mongodb://localhost:27017/my_database";
+const client = new MongoClient(uri, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
 });
 
+async function connectToMongoDB() {
+  try {
+    // Connect to the MongoDB server
+    await client.connect();
+
+    console.log("Connected to MongoDB");
+
+    // Now you can perform database operations
+
+    // For example, you can access a collection like this:
+    const db = client.db();
+    const collection = db.collection("my_collection"); // Replace 'my_collection' with your collection name
+
+    // Perform operations on the collection
+    // For example, insert documents
+    await collection.insertOne({ name: "John", age: 30 });
+  } catch (error) {
+    console.error("Error connecting to MongoDB:", error);
+  } finally {
+    // Close the connection when done
+    await client.close();
+  }
+}
+
+// Call the function to connect to MongoDB
+connectToMongoDB();
 app.use("/", (req, res) => {
   res.send("hellw world");
 });
@@ -36,8 +61,6 @@ app.use(
 // Initialize Passport
 app.use(passport.initialize());
 app.use(passport.session());
-const uri = "mongodb://localhost:27017";
-const client = new MongoClient(uri);
 const { Facebook } = require("fb");
 const fb = new Facebook({ version: "v12.0" });
 const FB_APP_ID = "350708251284818";
