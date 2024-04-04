@@ -4,10 +4,18 @@ const passport = require("passport");
 const FacebookStrategy = require("passport-facebook").Strategy;
 const session = require("express-session");
 const app = express();
+var mongodb = require("mongodb");
 const PORT = 5000;
+var MongoClient = mongodb.MongoClient;
+MongoClient.connect(URL, function (err, database) {
+  error = err;
+  db = database;
 
-const database = require("./database/database");
-database();
+  waiting.forEach(function (callback) {
+    callback(err, database);
+  });
+});
+
 app.use("/", (req, res) => {
   res.send("hellw world");
 });
