@@ -4,43 +4,8 @@ const passport = require("passport");
 const FacebookStrategy = require("passport-facebook").Strategy;
 const session = require("express-session");
 const app = express();
-var mongodb = require("mongodb");
 const PORT = 5000;
 const { MongoClient } = require("mongodb");
-app.use(bodyParser.json());
-// Connection URI
-const uri = "mongodb://localhost:27017/my_database";
-const client = new MongoClient(uri, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
-
-async function connectToMongoDB() {
-  try {
-    // Connect to the MongoDB server
-    await client.connect();
-
-    console.log("Connected to MongoDB");
-
-    // Now you can perform database operations
-
-    // For example, you can access a collection like this:
-    const db = client.db();
-    const collection = db.collection("my_collection"); // Replace 'my_collection' with your collection name
-
-    // Perform operations on the collection
-    // For example, insert documents
-    await collection.insertOne({ name: "John", age: 30 });
-  } catch (error) {
-    console.error("Error connecting to MongoDB:", error);
-  } finally {
-    // Close the connection when done
-    await client.close();
-  }
-}
-
-// Call the function to connect to MongoDB
-connectToMongoDB();
 app.use("/", (req, res) => {
   res.send("hellw world");
 });
@@ -61,6 +26,8 @@ app.use(
 // Initialize Passport
 app.use(passport.initialize());
 app.use(passport.session());
+const uri = "mongodb://localhost:27017";
+const client = new MongoClient(uri);
 const { Facebook } = require("fb");
 const fb = new Facebook({ version: "v12.0" });
 const FB_APP_ID = "350708251284818";
@@ -102,8 +69,8 @@ app.get(
   }
 );
 
-app.get("/login", async (req, res) => {
-  const response = await axios.get(
+app.get("/login", (req, res) => {
+  const response = axios.get(
     `https://graph.facebook.com/oauth/access_token?client_id=${clientID}&client_secret=${clientSecret}&grant_type=client_credentials`
   );
   console.log("Access Token Response:", response.data);
@@ -119,16 +86,16 @@ app.get("/auth/initiate", (req, res) => {
   res.redirect(authUrl);
 });
 
-app.get("/auth/callback", async (req, res) => {
+app.get("/auth/callback", (req, res) => {
   const { code } = req.query;
   try {
-    const { access_token } = await fb.api("oauth/access_token", {
+    const { access_token } = fb.api("oauth/access_token", {
       client_id: FB_APP_ID,
       client_secret: FB_APP_SECRET,
       redirect_uri: FB_REDIRECT_URI,
       code,
     });
-    const userInfo = await fb.api("/me", {
+    const userInfo = fb.api("/me", {
       access_token: access_token,
     });
     // const userId = userInfo.id;
@@ -153,36 +120,36 @@ app.get("/auth/callback", async (req, res) => {
 });
 
 app.post("/auth/store", async (req, res) => {
-  const { userId, accessToken, otherData } = req.body;
+  const { accessToken } = req.body;
 
   try {
-    await client.connect();
-
-    const database = client.db("your-database-name");
-    const collection = database.collection("authenticationData");
-
-    const result = await collection.insertOne({
-      userId: userId,
-      accessToken: accessToken,
-      otherData: otherData,
+    const response = await axios.get(`https://graph.facebook.com/me/messages`, {
+      params: {
+        access_token: accessToken,
+      },
     });
 
-    console.log("Authentication data saved successfully:", result);
-    return {
-      success: true,
-      message: "Authentication data saved successfully",
-    };
+    await client.connect();
+
+    const database = client.db("facebook_messages");
+    const collection = database.collection("messages");
+
+    const result = await collection.insertMany(response.data.data);
+
+    console.log("Messages saved successfully:", result);
+    res.json({ success: true, message: "Messages saved successfully" });
   } catch (error) {
-    console.error("Error saving authentication data:", error);
-    return { success: false, message: "Failed to save authentication data" };
+    console.error("Error fetching and storing messages:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch and store messages" });
   } finally {
     await client.close();
   }
 });
-
-app.post("/auth/refresh", async (req, res) => {
+app.post("/auth/refresh", (req, res) => {
   const { accessToken } = req.body;
-  const response = await axios.get(`https://graph.facebook.com/debug_token`, {
+  const response = axios.get(`https://graph.facebook.com/debug_token`, {
     params: {
       input_token: accessToken,
       access_token: "your-app-access-token",
@@ -229,7 +196,7 @@ app.delete("/auth/remove", async (req, res) => {
     await client.close();
   }
 });
-app.post("/auth/reverify", async (req, res) => {
+app.post("/auth/reverify", (req, res) => {
   const { userId } = req.body;
 
   try {
